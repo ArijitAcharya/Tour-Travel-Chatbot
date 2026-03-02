@@ -15,7 +15,7 @@ This project implements a travel chatbot powered by the RAG (Retrieve and Genera
 ### Prerequisites
 
 - Python 3.7 or higher
-- OpenAI API key
+- Groq API key
 - Google Serper API key
 - OpenWeatherMap API key
 
@@ -24,8 +24,8 @@ This project implements a travel chatbot powered by the RAG (Retrieve and Genera
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/samthakur587/travel-chatbot
-    cd travel-chatbot
+    git clone https://github.com/your-username/Chatbot-App.git
+    cd Chatbot-App
     ```
 
 2. Install dependencies:
@@ -35,22 +35,31 @@ This project implements a travel chatbot powered by the RAG (Retrieve and Genera
     ```
 
 3. Set up environment variables:
-
-    - `OPENAI_API_KEY`: Your OpenAI API key
-    - `SERPER_API_KEY`: Your Google Serper API key
-    - `OPENWEATHERMAP_API_KEY`: Your OpenWeatherMap API key
+    Create a `.env` file and add the following:
+    ```
+    GROQ_API_KEY="YOUR_GROQ_API_KEY"
+    SERPER_API_KEY="YOUR_SERPER_API_KEY"
+    OPENWEATHERMAP_API_KEY="YOUR_OPENWEATHERMAP_API_KEY"
+    ```
 
 4. Run the application:
 
     ```bash
     streamlit run app.py
     ```
-
+### Running with Docker
+1. Build the Docker image:
+    ```bash
+    docker build -t travel-chatbot .
+    ```
+2. Run the Docker container:
+    ```bash
+    docker run -p 8501:8501 travel-chatbot
+    ```
 ### Usage
 
 - Access the application via the provided Streamlit URL.
 - Input your query or engage in a conversation with the travel chatbot.
-- If prompted, enter your OpenAI API key in the sidebar.
 
 ## Contributing
 
