@@ -1,0 +1,15 @@
+Welcome to our travel service!
+
+We offer a variety of destinations and packages to suit every traveler's needs.
+
+Popular Destinations:
+- Paris, France: Known for its art, fashion, and culture. Key attractions include the Eiffel Tower, the Louvre Museum, and the Notre-Dame Cathedral.
+- Tokyo, Japan: A bustling metropolis where traditional culture meets futuristic technology. Visit the Imperial Palace, Senso-ji Temple, and the trendy Shibuya district.
+- Rome, Italy: A city rich in history, with ancient ruins at every corner. Explore the Colosseum, the Roman Forum, and Vatican City.
+
+Travel Packages:
+- Adventure Seeker: Includes hiking, zip-lining, and other thrilling activities.
+- Cultural Explorer: Focuses on museums, historical sites, and local traditions.
+- Relaxation Getaway: Offers beach-side resorts, spa treatments, and leisurely tours.
+
+For more information, please ask our travel assistant! 

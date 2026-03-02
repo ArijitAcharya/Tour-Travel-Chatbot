@@ -1,14 +1,21 @@
-from langchain.llms.openai import OpenAI
-from langchain import PromptTemplate, LLMChain
-from langchain.memory import ConversationBufferMemory
-from langchain.agents import Tool
-from langchain.agents import tool
-from langchain.agents import AgentType
-from langchain.utilities import GoogleSerperAPIWrapper
-from langchain.utilities import OpenWeatherMapAPIWrapper
-from langchain.agents import initialize_agent
 import os
 import streamlit as st
+from langchain.chains import LLMChain
+from langchain.memory import ConversationBufferMemory
+from langchain.agents import Tool, AgentType, initialize_agent, tool
+from langchain.tools.retriever import create_retriever_tool
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+from langchain_community.utilities import GoogleSerperAPIWrapper, OpenWeatherMapAPIWrapper
+from langchain_community.document_loaders import TextLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, HumanMessage
+
+# Load environment variables from .env file
+load_dotenv()
 
 @tool
 def get_word_length(word: str) -> int:
@@ -16,75 +23,112 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 @st.cache_resource(show_spinner=False)
-def LLM_init(openai_api_key):
-    os.environ["OPENWEATHERMAP_API_KEY"] = "4d4e54063f06f26b9e686dfb7fa29a33"
-    os.environ["SERPER_API_KEY"] =  "e472b00872e8446ecbf94321d0f53ca351c9da85"
-    os.environ["OPENAI_API_KEY"] = openai_api_key
+def LLM_init():
+    # Load and process the document
+    loader = TextLoader("documents/travel_info.txt")
+    documents = loader.load()
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    docs = text_splitter.split_documents(documents)
+
+    # HuggingFace Embeddings
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+    # Chroma vector store
+    vectordb = Chroma.from_documents(docs, embeddings, persist_directory="./chroma_db")
+    retriever = vectordb.as_retriever()
+
+    # Groq LLM
+    llm = ChatGroq(
+        groq_api_key=os.getenv("GROQ_API_KEY"),
+        model_name="LLaMA3-8b-8192"
+    )
+
+    # Tools
     weather = OpenWeatherMapAPIWrapper()
     search = GoogleSerperAPIWrapper()
-    llm = OpenAI(temperature=0)
 
-    tools =[
+    retriever_tool = create_retriever_tool(
+        retriever,
+        "Travel Information",
+        "answers questions about travel from provided documents"
+    )
+
+    tools = [
         Tool(
             name="current search",
             func=search.run,
-            description="useful for when you need to answer questions about current events or the current state of the world"
+            description="useful for answering current events or facts"
         ),
         Tool(
-            name = "weather",
-            func = weather.run,
-            description = "Return current weather data based on location"
+            name="weather",
+            func=weather.run,
+            description="returns current weather data for a location"
         ),
         Tool(
-            name = "getlength",
-            func = get_word_length,
-            description = "Return the length of a word"
+            name="getlength",
+            func=get_word_length,
+            description="returns the length of a word"
         ),
+        retriever_tool
     ]
 
-    memory = ConversationBufferMemory(memory_key="chat_history")
-    
+    memory = ConversationBufferMemory(
+        chat_memory=StreamlitChatMessageHistory(key="messages"),
+        memory_key="chat_history",
+        return_messages=True
+    )
+
     llm_chain = initialize_agent(
         tools,
         agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-        llm=llm, 
-        memory=memory, 
+        llm=llm,
+        memory=memory,
         verbose=True,
     )
-    
+
     return llm_chain
 
 
+# --- Streamlit UI ---
+st.set_page_config(page_title="Travel Assistant", page_icon="✈️", layout="wide")
 
- #Set page title and configuration
-st.set_page_config(page_title="🦜🔗 Travel App ")
+with st.sidebar:
+    st.title("✈️ Travel Assistant")
+    st.info(
+        "This is a smart travel assistant powered by LangChain and Groq. I can help you with:\n"
+        "- **Travel Information:** Answering questions based on provided documents.\n"
+        "- **Current Events:** Searching the web for real-time information.\n"
+        "- **Weather:** Providing current weather forecasts.\n\n"
+        "Ask me anything in the chat!"
+    )
 
-# Main title
-st.title('🦜🔗 Travel App')
+st.header("💬 Chat with your Travel Assistant")
 
-# Title for the chat assistant
-st.title("💬 Travel Assistant")
 
-# Sidebar to input OpenAI key
-openai_key = st.sidebar.text_input("Enter OpenAI Key", "")
-
+# Initial Assistant Message
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "Hi, I am your travel consultant. How can I help you?"}]
 
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-if prompt := st.chat_input():
-
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    
-    # Perform OpenAI processing
-    if openai_key:  # Check if OpenAI key is provided
-        llm_chain = LLM_init(openai_api_key=openai_key)
-        msg = llm_chain(prompt)
-
-        st.session_state.messages.append({"role": "assistant", "content": msg["output"]})
-        st.chat_message("assistant").write(msg["output"])
+    if isinstance(msg, AIMessage):
+        st.chat_message("assistant", avatar="🤖").write(msg.content)
+    elif isinstance(msg, HumanMessage):
+        st.chat_message("user", avatar="🧑‍💻").write(msg.content)
     else:
-        st.warning("Please input your OpenAI key in the sidebar.")
+        avatar = "🧑‍💻" if msg["role"] == "user" else "🤖"
+        st.chat_message(msg["role"], avatar=avatar).write(msg["content"])
+
+if prompt := st.chat_input("Ask me about travel, weather, or current events..."):
+    st.chat_message("user", avatar="🧑‍💻").write(prompt)
+
+    if all([os.getenv("GROQ_API_KEY"), os.getenv("SERPER_API_KEY"), os.getenv("OPENWEATHERMAP_API_KEY")]):
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("Thinking..."):
+                agent = LLM_init()
+                response = agent.invoke(
+                    {"input": prompt}
+                )
+                st.write(response["output"])
+    else:
+        st.warning("Missing required environment variables. Please make sure .env file is configured.")
+        st.stop()
